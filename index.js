@@ -11,8 +11,6 @@ const dbPassword = process.env.DB_PASSWORD;
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-app.set("view engine", "ejs");
-
 const db = new pg.Client({
   host: "localhost",
   user: "postgres",
