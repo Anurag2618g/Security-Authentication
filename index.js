@@ -2,10 +2,12 @@ import express from "express";
 import bodyParser from "body-parser";
 import pg from "pg";
 import dotenv from "dotenv";
+import bcrypt from "bcrypt";
 
 dotenv.config();
 const app = express();
 const port = 3000;
+const saltRounds = 10;
 
 const dbPassword = process.env.DB_PASSWORD;
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -38,10 +40,17 @@ app.post("/register", async (req, res) => {
   try {
     const checkUser = await db.query("SELECT * FROM users WHERE email = $1", [email]);
     if (checkUser.rows.length > 0) {
-      res.render("register.ejs", { message: "User already exists" });
+      res.send("User already exists. Try logging in");
     } else {
-      await db.query("INSERT INTO users (email, password) VALUES ($1, $2)", [email, password]);
-      res.render("secrets.ejs");
+      //Hashing Password
+      bcrypt.hash(password, saltRounds, async(err, hash) => {
+        if (err) {
+          res.send("Error in hashing" + err);
+        } else {
+          await db.query("INSERT INTO users (email, password) VALUES ($1, $2)", [email, hash]);
+          res.render("secrets.ejs");
+        }  
+      });
     }
   } catch (err) {
     console.log(err);
@@ -51,17 +60,24 @@ app.post("/register", async (req, res) => {
 
 app.post("/login", async (req, res) => {
   const email = req.body.username;
-  const password = req.body.password;
+  const loginPassword = req.body.password;
   try {
     const result = await db.query("SELECT * FROM users WHERE email = $1", [email]);
     if (result.rows.length > 0) {
-      if (result.rows[0].password === password) {
-        res.render("secrets.ejs");
-      } else {
-        res.render("login.ejs", { message: "Incorrect password" });
-      }
+      const storedPassword = result.rows[0].password;
+      bcrypt.compare(loginPassword, storedPassword, (err, result) => {
+        if (err) {
+          console.log("Error comparing passwords", err);
+        } else {
+          if (result) {
+            res.render("secrets.ejs");
+          } else {
+            res.send("Incorrect password");
+          }
+        }
+      }); 
     } else {
-      res.render("login.ejs", { message: "Incorrect username" });
+      res.render("login.ejs", { message: "User not found" });
     }
   } catch (err) {
     console.log(err);
