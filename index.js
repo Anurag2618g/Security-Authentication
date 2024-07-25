@@ -56,12 +56,30 @@ app.get("/logout", (req, res) => {
   });
 });
 
-app.get("/secrets", (req, res) => {
+app.get("/secrets", async (req, res) => {
+  try {
+    const result = await db.query("SELECT secret FROM users WHERE email=$1", [req.user.email]);
+    const secret = result.rows[0].secret;
+    if (secret) {
+      res.render("secrets.ejs", {
+        secret: secret,
+      });
+    } else {
+      res.render("secrets.ejs", {
+        secret: "You should submit a secret."
+      });
+    }
+  } catch (err) {
+    console.log(err);
+  }
+}); 
+
+app.get("/submit", (req,res) => {
   if (req.isAuthenticated()) {
-    res.render("secrets.ejs");
+    res.render("submit.ejs");
   } else {
     res.redirect("/login");
-  }
+  } 
 });
 
 app.get(
@@ -118,6 +136,15 @@ app.post("/register", async (req, res) => {
   } catch (err) {
     console.log(err);
   }
+});
+
+app.post("/submit", async(req,res) => {
+  try {
+    await db.query("UPDATE users SET secret = $1 WHERE email = $2", [req.body.secret, req.user.email]);
+    res.redirect("/secrets");
+  } catch (err) {
+    console.log(err);
+  } 
 });
 
 passport.use(
@@ -184,6 +211,7 @@ passport.use(
 passport.serializeUser((user, cb) => {
   cb(null, user);
 });
+
 passport.deserializeUser((user, cb) => {
   cb(null, user);
 });
